@@ -81,9 +81,16 @@ def get_draws(ds, attr, seed, n, k=30):
 
 @st.cache_data(max_entries=32, show_spinner=False)
 def get_fix(ds, attr, seed, n):
-    f = E.fix(get_run(ds, attr, seed), n)
-    f["measure"] = {k: v for k, v in f["measure"].items() if k not in ("lab", "q")}
+    f = E.fix_from_rows(stored_rows(), ds, attr, seed, n)  # a seed the study ran: rebuild it, no retraining
+    if f is None:
+        f = E.fix(get_run(ds, attr, seed), n)
+        f["measure"] = {k: v for k, v in f["measure"].items() if k not in ("lab", "q")}
     return f
+
+
+@st.cache_resource(show_spinner=False)
+def stored_rows():
+    return E.stored_rows()
 
 
 @st.cache_data(show_spinner=False)
@@ -293,6 +300,12 @@ def page_fix():
     setting_line(run, n)
     with st.spinner("Training the original, corrected, comparison and oracle models (about 15 fits)…"):
         f = get_fix(DS, ATTR, int(seed), n)
+    if f["source"] == "stored":
+        st.caption(f"Seed {int(seed)} is one of the study's confirmatory runs, so the models' results are read from "
+                   "its stored rows instead of being retrained (identical to a live rerun; the tests check this). "
+                   "Other seeds and datasets are computed live.")
+    else:
+        st.caption("Computed live: the study has no stored run for this dataset, seed and label budget.")
     m, s, erm = f["measure"], f["sel"], f["erm"]
     if f["applied"]:
         st.success(f"Safety rule: the guesser measures a gap of **{m['est_proxy']:.3f} ≥ {E.GUARD}**, so the "

@@ -172,4 +172,30 @@ def fix(run, n, draw=0, guard=GUARD, budget=BUDGET, with_baseline=True):
     proxy = sel.loc["proxy_soft"]
     deployed = proxy if applied else None
     return dict(raw=raw, sel=sel, erm=erm, measure=meas, applied=applied, guard=guard,
-                proxy=proxy, deployed=deployed, harm=bool(proxy.eo_gap > proxy.eo_gap0 + HARM))
+                proxy=proxy, deployed=deployed, harm=bool(proxy.eo_gap > proxy.eo_gap0 + HARM), source="live")
+
+
+STORED_ROWS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "e2_rows.csv.gz")
+
+
+def stored_rows():
+    """The study's own E2 rows for the 8 main targets, seeds 0-29 (written by app/build_summaries.py)."""
+    return pd.read_csv(STORED_ROWS)
+
+
+def fix_from_rows(rows, ds, attr, seed, n, guard=GUARD, budget=BUDGET):
+    """fix() for a seed the study already ran, rebuilt from its stored rows instead of retraining ~15 models.
+    Returns None when the study has no rows for this target, seed and budget."""
+    d = rows[(rows.dataset == ds) & (rows.attr == attr) & (rows.seed == int(seed))]
+    d = d[(d.method != "proxy_soft") | (d.nlab == n)].reset_index(drop=True)
+    if not ((d.method == "erm").any() and (d.method == "proxy_soft").any()):
+        return None
+    sel = choose(d, budget, "T1").set_index("method")
+    erm = d[d.method == "erm"].iloc[0]
+    p = d[d.method == "proxy_soft"].iloc[0]
+    meas = dict(true_eo=p.true_eo, est_naive=p.est_naive, est_proxy=p.est_proxy, proxy_auc=p.proxy_auc,
+                n_labelled=int(p.nlab_actual), n_group_labelled=int(round(p.lab_minfrac * p.nlab_actual)))
+    applied = meas["est_proxy"] >= guard
+    proxy = sel.loc["proxy_soft"]
+    return dict(raw=d, sel=sel, erm=erm, measure=meas, applied=applied, guard=guard, proxy=proxy,
+                deployed=proxy if applied else None, harm=bool(proxy.eo_gap > proxy.eo_gap0 + HARM), source="stored")

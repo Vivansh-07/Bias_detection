@@ -259,7 +259,7 @@ We report these openly. They make the work more trustworthy, not less.
 
 The **Hidden-Group Bias Lab** reruns the study's own code for one seed at a time. Pick a dataset and a hidden group, choose how many people reveal their group, and watch the three findings happen.
 
-**Live:** <https://hidden-group-bias.streamlit.app>. If nobody has used it for a while, Streamlit takes about a minute to wake it up, and the first **Fix** run on a dataset takes up to half a minute (later visits are cached).
+**Live:** <https://hidden-group-bias.streamlit.app>. If nobody has used it for a while, Streamlit takes about a minute to wake it up. For the study's seeds 0-29 on the 8 main datasets, **Fix** reads the stored runs instantly; other seeds and datasets are recomputed live, which can take half a minute.
 
 | Page | What you see |
 |---|---|

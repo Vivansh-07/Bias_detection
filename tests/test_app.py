@@ -38,6 +38,37 @@ def test_fix_reproduces_the_stored_rows(e2, ds, attr, seed, n):
         assert f["measure"][k] == pytest.approx(p[k], abs=1e-12), k
 
 
+@pytest.fixture(scope="module")
+def stored():
+    return E.stored_rows()
+
+
+@pytest.mark.parametrize("ds,attr,seed,n", [("law", "race", 0, 100), ("compas", "race", 3, 50), ("german", "age", 5, 25),
+                                            ("adult", "sex", 25, 400)])
+def test_stored_rows_give_the_same_result_as_retraining(stored, ds, attr, seed, n):
+    live, fast = E.fix(E.Run(ds, attr, seed), n), E.fix_from_rows(stored, ds, attr, seed, n)
+    assert fast["source"] == "stored" and live["source"] == "live"
+    for c in ("eo_gap", "eo_gap0", "auc", "acc", "mu"):
+        assert np.allclose(live["sel"][c].sort_index(), fast["sel"][c].sort_index(), atol=1e-12), c
+    assert live["applied"] == fast["applied"] and live["harm"] == fast["harm"]
+    for k in ("true_eo", "est_naive", "est_proxy", "proxy_auc", "n_labelled", "n_group_labelled"):
+        assert live["measure"][k] == pytest.approx(fast["measure"][k], abs=1e-12), k
+
+
+def test_stored_rows_fall_back_to_live_when_missing(stored):
+    assert E.fix_from_rows(stored, "law", "race", 30, 100) is None  # seed outside 0-29
+    assert E.fix_from_rows(stored, "bank", "age", 0, 100) is None  # pair outside the main study
+    assert E.fix_from_rows(stored, "german", "age", 0, 400) is None  # budget the pool cannot supply
+
+
+def test_stored_rows_are_current():
+    fresh = build_summaries.fix_rows()
+    stored = pd.read_csv(os.path.join(ROOT, "app", "data", "e2_rows.csv.gz"))
+    num = stored.select_dtypes("number").columns
+    assert stored.shape == fresh.shape
+    assert np.allclose(stored[num].to_numpy(float), fresh[num].to_numpy(float), equal_nan=True, rtol=0, atol=0)
+
+
 @pytest.mark.parametrize("ds,attr,seed", [("law", "race", 0), ("adult", "sex", 7), ("compas", "sex", 12)])
 def test_audit_reproduces_e1(ds, attr, seed):
     a = E.audit(E.Run(ds, attr, seed))

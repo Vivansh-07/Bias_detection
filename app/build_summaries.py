@@ -27,6 +27,18 @@ def load(names):
     return d
 
 
+ROW_COLS = ["dataset", "attr", "seed", "method", "strategy", "nlab", "mu", "pool_auc", "eo_gap", "tpr_gap", "fpr_gap",
+            "dp_gap", "auc", "acc", "worst_tpr", "true_eo", "est_naive", "est_proxy", "proxy_auc", "nlab_actual",
+            "lab_minfrac"]
+
+
+def fix_rows():
+    """The e2 rows the app's Fix page needs (ERM, oracle, cluster reweighting, random proxy), full precision."""
+    d = pd.concat([pd.read_csv(os.path.join(R, f + ".csv")) for f in CLASSIC]).drop_duplicates(KEYS)
+    d = d[d.method.isin(["erm", "oracle", "cluster_rw"]) | ((d.method == "proxy_soft") & (d.strategy == "random"))]
+    return d[ROW_COLS].sort_values(["dataset", "attr", "seed", "method", "nlab", "mu"]).reset_index(drop=True)
+
+
 def target_name(t):
     return t.replace("acs_", "").replace("_ACSIncome", " income").replace("_ACSEmployment", " employment")
 
@@ -120,6 +132,9 @@ if __name__ == "__main__":
     for name, t in tables.items():
         t.to_csv(os.path.join(OUT, name + ".csv"), index=False, float_format="%.6g")
         print(f"{name}: {len(t)} rows")
+    rows = fix_rows()  # full precision: the app rebuilds stored seeds from these exactly
+    rows.to_csv(os.path.join(OUT, "e2_rows.csv.gz"), index=False, compression={"method": "gzip", "mtime": 0})
+    print(f"e2_rows: {len(rows)} rows")
     a = tables["audit"]
     print("audit runs", a.runs.sum(), "hidden first", a.hidden_first.sum())
     print(tables["guard"].round(3).to_string())
