@@ -76,7 +76,16 @@ def get_audit(ds, attr, seed):
 
 @st.cache_data(max_entries=32, show_spinner=False)
 def get_draws(ds, attr, seed, n, k=30):
-    return E.measure_draws(get_run(ds, attr, seed), n, k)
+    """(draws, source): precomputed for the study's seeds on the 8 main targets, otherwise computed live."""
+    d = E.draws_from_rows(stored_draws(), ds, attr, seed, n, k)
+    if d is not None:
+        return d, "stored"
+    return E.measure_draws(get_run(ds, attr, seed), n, k), "live"
+
+
+@st.cache_resource(show_spinner=False)
+def stored_draws():
+    return E.stored_draws()
 
 
 @st.cache_data(max_entries=32, show_spinner=False)
@@ -233,7 +242,7 @@ def page_measure():
     run, n = run_and_budget()
     setting_line(run, n)
     with st.spinner("Drawing 30 different sets of people…"):
-        d = get_draws(DS, ATTR, int(seed), n)
+        d, source = get_draws(DS, ATTR, int(seed), n)
     r0 = d.iloc[0]
     c = st.columns(3)
     c[0].metric("True gap (answer key)", f"{r0.true_eo:.3f}")
@@ -266,7 +275,9 @@ def page_measure():
     st.markdown(f"Over 30 different sets of {n} people, the average error is **{e_n:.3f}** using only the labelled "
                 f"people and **{e_p:.3f}** with the guesser ({e_n / e_p:.1f}× smaller). Small samples are noisy, and "
                 "noise always looks like a gap, so the labelled-only estimate overstates the bias.")
-    st.caption("Draw 0 is the set of people the study used for this seed; draws 1–29 are new random sets.")
+    st.caption("Draw 0 is the set of people the study used for this seed; draws 1–29 are new random sets. " +
+               ("They were precomputed for the study's seeds (identical to drawing them again; the tests check this)."
+                if source == "stored" else "They were computed live for this seed."))
     e5 = saved("e5")
     long5 = e5.melt(id_vars=["family", "nlab"], value_vars=["err_labelled", "err_proxy"], var_name="m", value_name="err")
     long5["Method"] = long5.m.map({"err_labelled": "Only the labelled people", "err_proxy": "Guesser on the whole pool"})

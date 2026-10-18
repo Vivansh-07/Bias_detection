@@ -176,6 +176,20 @@ def fix(run, n, draw=0, guard=GUARD, budget=BUDGET, with_baseline=True):
 
 
 STORED_ROWS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "e2_rows.csv.gz")
+STORED_DRAWS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "measure_draws.csv.gz")
+
+
+def stored_draws():
+    """measure_draws() for the 8 main targets, seeds 0-29 and every budget (written by build_summaries.py --draws)."""
+    return pd.read_csv(STORED_DRAWS)
+
+
+def draws_from_rows(rows, ds, attr, seed, n, k=30):
+    """measure_draws(run, n, k) read from the stored draws; None when they were not precomputed."""
+    d = rows[(rows.dataset == ds) & (rows.attr == attr) & (rows.seed == int(seed)) & (rows.nlab == n) & (rows.draw < k)]
+    if len(d) < k:
+        return None
+    return d[["draw", "true_eo", "labelled_only", "proxy"]].sort_values("draw").reset_index(drop=True)
 
 
 def stored_rows():

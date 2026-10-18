@@ -61,6 +61,29 @@ def test_stored_rows_fall_back_to_live_when_missing(stored):
     assert E.fix_from_rows(stored, "german", "age", 0, 400) is None  # budget the pool cannot supply
 
 
+@pytest.fixture(scope="module")
+def draws():
+    return E.stored_draws()
+
+
+@pytest.mark.parametrize("ds,attr,seed,n", [("adult", "sex", 0, 100), ("german", "age", 17, 25), ("dutch", "sex", 29, 400)])
+def test_stored_draws_equal_drawing_again(draws, ds, attr, seed, n):
+    live = E.measure_draws(E.Run(ds, attr, seed), n, 30)
+    fast = E.draws_from_rows(draws, ds, attr, seed, n)
+    assert np.allclose(live.to_numpy(float), fast.to_numpy(float), atol=1e-12, equal_nan=True)
+
+
+def test_stored_draws_cover_the_study_and_fall_back_otherwise(draws):
+    from fairlab.data import TARGETS
+    per = draws.groupby(["dataset", "attr", "seed", "nlab"]).draw.nunique()
+    assert (per == 30).all()
+    assert set(per.reset_index().pipe(lambda x: zip(x.dataset, x.attr))) == set(TARGETS)
+    assert draws.groupby(["dataset", "attr"]).seed.nunique().eq(30).all()
+    assert sorted(draws[draws.dataset == "german"].nlab.unique()) == [25, 50, 100]
+    assert E.draws_from_rows(draws, "law", "race", 30, 100) is None
+    assert E.draws_from_rows(draws, "bank", "age", 0, 100) is None
+
+
 def test_stored_rows_are_current():
     fresh = build_summaries.fix_rows()
     stored = pd.read_csv(os.path.join(ROOT, "app", "data", "e2_rows.csv.gz"))

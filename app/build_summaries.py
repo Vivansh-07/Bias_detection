@@ -39,6 +39,21 @@ def fix_rows():
     return d[ROW_COLS].sort_values(["dataset", "attr", "seed", "method", "nlab", "mu"]).reset_index(drop=True)
 
 
+def measure_draw_rows(k=30):
+    """The Measure page's 30 label draws for the 8 main targets, seeds 0-29 and every budget (slow: ~20 min)."""
+    import engine as E
+    from fairlab.data import TARGETS
+    out = []
+    for ds, attr in TARGETS:
+        for seed in range(30):
+            run = E.Run(ds, attr, seed)
+            for n in run.budgets():
+                out.append(E.measure_draws(run, n, k).assign(dataset=ds, attr=attr, seed=seed, nlab=n))
+        print(f"  draws: {ds}-{attr} done", flush=True)
+    cols = ["dataset", "attr", "seed", "nlab", "draw", "true_eo", "labelled_only", "proxy"]
+    return pd.concat(out)[cols].reset_index(drop=True)
+
+
 def target_name(t):
     return t.replace("acs_", "").replace("_ACSIncome", " income").replace("_ACSEmployment", " employment")
 
@@ -135,6 +150,10 @@ if __name__ == "__main__":
     rows = fix_rows()  # full precision: the app rebuilds stored seeds from these exactly
     rows.to_csv(os.path.join(OUT, "e2_rows.csv.gz"), index=False, compression={"method": "gzip", "mtime": 0})
     print(f"e2_rows: {len(rows)} rows")
+    if "--draws" in sys.argv:  # slow, so only on request
+        draws = measure_draw_rows()
+        draws.to_csv(os.path.join(OUT, "measure_draws.csv.gz"), index=False, compression={"method": "gzip", "mtime": 0})
+        print(f"measure_draws: {len(draws)} rows")
     a = tables["audit"]
     print("audit runs", a.runs.sum(), "hidden first", a.hidden_first.sum())
     print(tables["guard"].round(3).to_string())
